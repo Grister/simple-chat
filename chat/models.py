@@ -14,12 +14,12 @@ class ChatRoomModel(models.Model):
 
     @property
     def link(self):
-        return f"ws/chat/{self.uuid}"
+        return f"chat/{self.uuid}"
 
 
 class ParticipantModel(models.Model):
     user = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name='chats')
-    group = models.ForeignKey(ChatRoomModel, on_delete=models.CASCADE, related_name='participant')
+    group = models.ForeignKey(ChatRoomModel, on_delete=models.CASCADE, related_name='participants')
 
     def __str__(self):
         return f'{self.user} -- {self.group}'

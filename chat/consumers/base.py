@@ -1,7 +1,7 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 
-from chat.models import ChatRoomModel, ParticipantModel, MessageModel, UserModel
+from chat.models import ChatRoomModel, ParticipantModel, UserModel
 
 
 class BaseConsumer(AsyncJsonWebsocketConsumer):
@@ -126,4 +126,4 @@ class MainConsumer(BaseConsumer):
     @database_sync_to_async
     def user_list(self):
         users = UserModel.objects.all().exclude(pk=self.scope['user'].id)
-        return [{'id': u.id, 'username': u.username} for u in users]
+        return [{'id': user.id, 'username': user.username} for user in users]
