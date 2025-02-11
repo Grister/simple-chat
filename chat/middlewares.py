@@ -13,6 +13,22 @@ def get_user_by_token(token):
         return AnonymousUser
 
 
+class CheckValidPath:
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        try:
+            return await self.inner(scope, receive, send)
+        except ValueError:
+            await send({
+                'type': 'websocket.close',
+                'code': 1000,
+                'detail': 'Invalid route'
+            })
+            return
+
+
 class TokenAuthMiddleware:
     def __init__(self, inner):
         self.inner = inner
@@ -31,3 +47,6 @@ class TokenAuthMiddleware:
 
 def TokenAuthMiddlewareStack(inner):
     return TokenAuthMiddleware(AuthMiddlewareStack(inner))
+
+def CheckValidPathStack(inner):
+    return CheckValidPath(TokenAuthMiddlewareStack(inner))

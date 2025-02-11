@@ -1,7 +1,7 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 
-from chat.models import ChatRoomModel, ParticipantModel, UserModel
+from chat.models import ChatRoomModel, ParticipantModel, UserModel, MessageModel
 
 
 class BaseConsumer(AsyncJsonWebsocketConsumer):
@@ -59,6 +59,18 @@ class BaseConsumer(AsyncJsonWebsocketConsumer):
 
 
 class MainConsumer(BaseConsumer):
+    async def connect(self):
+        await super().connect()
+        self.channel = f'user_{self.scope['user'].id}'
+        await self.channel_layer.group_add(self.channel, self.channel_name)
+
+    async def disconnect(self, code):
+        await self.channel_layer.group_discard(self.channel, self.channel_name)
+        return await super().disconnect(code)
+
+    async def send_notification(self, event):
+        return await self._send_message(message=event['message'], event=event['type'])
+
     async def event_group_create(self, massage):
         if (isinstance(massage['data'].get('name'), str)
                 and isinstance(massage['data'].get('participants'), list)):

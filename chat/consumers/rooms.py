@@ -84,7 +84,10 @@ class ChatRoomConsumer(BaseConsumer):
                 )
         return await self._throw_error(
             message={
-                'detail': 'Invalid input'
+                'detail': 'Invalid input',
+                'valid_data_example': {
+                    'users': [1, 2, 3],
+                }
             },
             event=message['event']
         )
@@ -98,7 +101,10 @@ class ChatRoomConsumer(BaseConsumer):
                 })
         return await self._throw_error(
             message={
-                'detail': 'Wrong input data'
+                'detail': 'Wrong input data',
+                'valid_data_example': {
+                    'user': 1,
+                }
             },
             event=message['event']
         )
