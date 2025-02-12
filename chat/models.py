@@ -6,8 +6,13 @@ UserModel = get_user_model()
 
 
 class ChatRoomModel(models.Model):
+    TYPES = {
+        'dialog': 'Dialog',
+        'group': 'GroupChat'
+    }
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, db_index=True)
+    type = models.CharField(max_length=10, choices=TYPES)
 
     def __str__(self):
         return self.name
@@ -20,6 +25,10 @@ class ChatRoomModel(models.Model):
 class ParticipantModel(models.Model):
     user = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name='chats')
     group = models.ForeignKey(ChatRoomModel, on_delete=models.CASCADE, related_name='participants')
+    is_creator = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = "user", "group"
 
     def __str__(self):
         return f'{self.user} -- {self.group}'

@@ -31,7 +31,7 @@ def message_notice(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=ParticipantModel)
 def message_notice(sender, instance, created, **kwargs):
-    if created:
+    if created and instance.group.type != 'dialog' and not instance.creator_permission:
         data = {
             'type': 'send.notification',
             'message': {

@@ -33,13 +33,24 @@ class TokenAuthMiddleware:
     def __init__(self, inner):
         self.inner = inner
 
+    # async def __call__(self, scope, receive, send):
+    #     headers = dict(scope['headers'])
+    #     if b'authorization' in headers:
+    #         try:
+    #             prefix, token = headers[b'authorization'].decode().split()
+    #             if prefix == 'Token':
+    #                 scope['user'] = await get_user_by_token(token)
+    #         except ValueError:
+    #             pass
+    #     return await self.inner(scope, receive, send)
+
     async def __call__(self, scope, receive, send):
-        headers = dict(scope['headers'])
-        if b'authorization' in headers:
+        headers = scope['query_string'].decode()
+
+        if headers.startswith('authorization='):
             try:
-                prefix, token = headers[b'authorization'].decode().split()
-                if prefix == 'Token':
-                    scope['user'] = await get_user_by_token(token)
+                _, token = headers.split('=')
+                scope['user'] = await get_user_by_token(token)
             except ValueError:
                 pass
         return await self.inner(scope, receive, send)

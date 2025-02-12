@@ -1,7 +1,7 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 
-from chat.models import ChatRoomModel, ParticipantModel, UserModel, MessageModel
+from chat.models import ChatRoomModel, ParticipantModel, UserModel
 
 
 class BaseConsumer(AsyncJsonWebsocketConsumer):
@@ -73,14 +73,25 @@ class MainConsumer(BaseConsumer):
 
     async def event_group_create(self, massage):
         if (isinstance(massage['data'].get('name'), str)
-                and isinstance(massage['data'].get('participants'), list)):
-            await self.create_group(massage['data']['name'], massage['data']['participants'])
-            return await self._send_message(message={'detail': 'Group was created'}, event=massage['event'])
+                and isinstance(massage['data'].get('participants'), list)
+                and isinstance(massage['data'].get('type'), str)):
+            group = await self.create_group(
+                name=massage['data']['name'],
+                participants=massage['data']['participants'],
+                chat_type=massage['data']['type']
+            )
+            if group:
+                return await self._send_message(
+                    message={'detail': f'Group {group.name} was created'},
+                    event=massage['event']
+                )
+
         return await self._throw_error(message={
             'detail': 'Invalid data',
             'valid_data_example': {
                 'name': 'your_group_name',
-                'participants': [1, 2, 3]
+                'participants': [1, 2, 3],
+                'type': 'group'
             }
         })
 
@@ -90,6 +101,7 @@ class MainConsumer(BaseConsumer):
                 'available_events': [
                     'group.create',
                     'group.list',
+                    'group.delete',
                     'user.list',
                     'event.list'
                 ]
@@ -99,7 +111,7 @@ class MainConsumer(BaseConsumer):
 
     async def event_group_list(self, message):
         return await self._send_message(
-            message=await self.group_list(user=self.scope['user']),
+            message=await self.group_list(self.scope['user']),
             event=message['event']
         )
 
@@ -109,29 +121,66 @@ class MainConsumer(BaseConsumer):
             event=message['event']
         )
 
+    async def event_group_delete(self, message):
+        if isinstance(message['data'].get('group'), str):
+            group = message['data']['group']
+            available_groups = {
+                group['group_name']: group['group_uuid']
+                for group in await self.group_list(self.scope['user'])
+                if group['is_creator']
+            }
+
+            if group in available_groups.keys():
+                await self.delete_group(available_groups[group])
+                return await self._send_message(
+                    message={
+                        'detail': f'Group {group} was deleted'
+                    },
+                    event=message['event']
+                )
+
+        return await self._throw_error(message={
+            'detail': 'Invalid data',
+            'valid_data_example': {
+                'group': 'GroupName',
+            }
+        })
+
     @database_sync_to_async
     def add_participant(self, group, user):
         participant = ParticipantModel(user=user, group=group)
         participant.save()
 
     @database_sync_to_async
-    def create_group(self, name, participants):
-        group = ChatRoomModel.objects.create(name=name)
-        participants.append(self.scope['user'].id)
+    def create_group(self, name, participants, chat_type):
+        if (chat_type not in ChatRoomModel.TYPES or
+                (chat_type == 'dialog' and len(participants) > 1)):
+            return
+        group = ChatRoomModel.objects.create(name=name, type=chat_type)
 
+        ParticipantModel.objects.create(group=group, user=self.scope['user'], is_creator=True)
         for participant in participants:
             user = UserModel.objects.filter(pk=participant).first()
             if user:
-                ParticipantModel.objects.create(group=group, user=user)
+                ParticipantModel.objects.get_or_create(group=group, user=user)
+
+        return group
+
+    @database_sync_to_async
+    def delete_group(self, group_uuid):
+        group = ChatRoomModel.objects.get(pk=group_uuid)
+        group.delete()
 
     @database_sync_to_async
     def group_list(self, user):
         data = []
-        chats = user.chats.all()
+        chats = user.chats.all().select_related("group")
         for chat in chats:
             data.append({
-                "grop_name": chat.group.name,
-                "group_link": chat.group.link
+                "group_uuid": str(chat.group.uuid),
+                "group_name": chat.group.name,
+                "group_link": chat.group.link,
+                "is_creator": chat.is_creator
             })
         return data
 

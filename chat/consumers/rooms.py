@@ -37,11 +37,23 @@ class ChatRoomConsumer(BaseConsumer):
             }
         )
 
+    @staticmethod
+    def creator_permission(func):
+        async def wrapper(self, *args, **kwargs):
+            creator = await self.get_creator()
+            if creator == self.scope['user']:
+                return await func(self, *args, **kwargs)
+            else:
+                return await self._throw_error(
+                    message={'detail': 'You do not have permissions to perform this action'},
+                )
+        return wrapper
+
     async def chat_message(self, event):
         return await self._send_message(message=event['message'], event=event['type'])
 
     async def event_send_message(self, message):
-        if isinstance(message['data'].get('message'), str):
+        if isinstance(message['data'].get('message'), str) and len(message['data']['message']) > 0:
             msg = await self.save_message(message['data']['message'])
             return await self._group_send(
                 message={
@@ -69,13 +81,15 @@ class ChatRoomConsumer(BaseConsumer):
             event=message['event']
         )
 
-    async def event_add_participant(self, message):
+    @creator_permission
+    async def event_add_participants(self, message):
         if isinstance(message['data'].get('users'), list):
             participants = []
             for user in message['data']['users']:
                 participant = await self.add_participant(user)
                 if participant:
                     participants.append(participant)
+
             if len(participants) > 0:
                 return await self._group_send(
                     message={
@@ -92,8 +106,9 @@ class ChatRoomConsumer(BaseConsumer):
             event=message['event']
         )
 
+    @creator_permission
     async def event_delete_participant(self, message):
-        if message['data'].get('user'):
+        if message['data'].get('user') and message['data']['user'] != self.scope['user'].id:
             user = await self.delete_participant(message['data']['user'])
             if user:
                 return await self._group_send(message={
@@ -115,7 +130,7 @@ class ChatRoomConsumer(BaseConsumer):
                 'available_events': [
                     'send.message',
                     'list.message',
-                    'add.participant',
+                    'add.participants',
                     'delete.participant',
                     'event.list'
                 ]
@@ -129,6 +144,13 @@ class ChatRoomConsumer(BaseConsumer):
             return ChatRoomModel.objects.get(uuid=self.group_id)
         except:
             return
+
+    @database_sync_to_async
+    def get_creator(self):
+        creator = ParticipantModel.objects.filter(group=self.group, is_creator=True).first()
+        if creator:
+            return creator.user
+        return
 
     @database_sync_to_async
     def get_participants(self):

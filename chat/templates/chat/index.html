@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Chat Rooms</title>
+</head>
+<body>
+    <input id="group_list" type="button" value="group_list">
+    <input id="user_list" type="button" value="user_list">
+    <br>
+
+    Enter the name and participants id's<br>
+    <input id="name-group" type="text" size="100" placeholder="Group name"><br>
+    <input id="participants-group" type="text" size="100" placeholder="Participants"><br>
+    <input id="type-group" type="text" size="100" placeholder="Type"><br>
+    <input id="group_create" type="button" value="group_create"><br>
+
+    What chat room would you like to enter?<br>
+    <input id="group_link" type="text" size="100" placeholder="Group link"><br>
+    <input id="group_connect" type="button" value="Enter"><br>
+
+    <textarea id="chat-log" cols="100" rows="20"></textarea><br>
+
+
+    <script>
+        const messageInputDom = document.querySelector('#room-name-input');
+        const auth = '?authorization=b28dc2318b0483ed1d570f486434a064966ec0d8'
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/' + auth
+        );
+
+        chatSocket.onmessage = function(e) {
+            document.querySelector('#chat-log').value += (e.data + '\n\n');
+        };
+
+        document.querySelector('#group_list').onclick = function(e) {
+            const message = '{"event": "group.list", "data": {}}';
+            chatSocket.send(message);
+            messageInputDom.value = '';
+        };
+
+        document.querySelector('#user_list').onclick = function(e) {
+            const message = '{"event": "user.list", "data": {}}';
+
+            chatSocket.send(message);
+            messageInputDom.value = '';
+        };
+
+        document.querySelector('#group_create').onclick = function(e) {
+            const name = document.querySelector('#name-group');
+            const participants = document.querySelector('#participants-group');
+            const type = document.querySelector('#type-group');
+
+            const message = `{"event": "group.create", "data": {"name": "${name.value}", "participants": [${participants.value}], "type": "${type.value}"}}`;
+
+            chatSocket.send(message);
+            name.value = '';
+            participants.value = '';
+            type.value = '';
+        };
+
+        document.querySelector('#group_connect').onclick = function(e) {
+            const path = document.querySelector('#group_link').value;
+            window.location.pathname = path + '/';
+        };
+    </script>
+</body>
+</html>
